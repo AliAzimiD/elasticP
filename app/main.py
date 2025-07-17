@@ -22,11 +22,10 @@ app = FastAPI(
 app.include_router(documents.router)
 
 
+# Startup event to ensure Elasticsearch index is created
 @app.on_event("startup")
 def startup_event():
-    """
-    Ensure index exists before serving traffic.
-    """
-    es = get_es_client()
+    # Wait up to ~60 s for ES
+    es = get_es_client(retries=12, delay=5)
     create_index_if_missing(es)
     logger.info("Startup complete – service ready.")

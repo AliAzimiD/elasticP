@@ -5,21 +5,38 @@ from app.core.config import get_settings
 from app.core.logger import logger
 
 settings = get_settings()
+_hosts = settings.es_host.split(",")
+_es: Elasticsearch | None = None      # cache
 
-def get_es_client(retries: int = 12, delay: int = 5) -> Elasticsearch:
-    """Return an ES client, retrying <retries> times with <delay>s back‑off."""
-    hosts = settings.es_host.split(",")
-    for attempt in range(1, retries + 1):
-        try:
-            es = Elasticsearch(hosts)
-            if es.ping():
-                return es
-        except Exception as exc:
-            logger.warning("ES connection failed (attempt %d/%d): %s",
-                           attempt, retries, exc)
-        time.sleep(delay)
-    raise ConnectionError(f"Cannot connect to Elasticsearch after {retries*delay}s")
+def _connect() -> Elasticsearch | None:
+    try:
+        es = Elasticsearch(_hosts, request_timeout=5)
+        if es.ping():
+            return es
+    except Exception as exc:
+        logger.warning("Elasticsearch unavailable: %s", exc)
+    return None
 
+def get_es_client(retries: int = 0, delay: int = 5) -> Elasticsearch:
+    """
+    Return a live ES client. If not yet reachable:
+    • during startup: keep retrying (blocking)        when retries > 0
+    • during request: raise HTTP 503 so caller can decide
+    """
+    global _es
+    if _es and _es.ping():
+        return _es
+
+    attempts = retries or 1
+    for attempt in range(1, attempts + 1):
+        es = _connect()
+        if es:
+            _es = es
+            return _es
+        if attempt < attempts:
+            time.sleep(delay)
+
+    raise ConnectionError("Elasticsearch still unreachable")
 
 
 def create_index_if_missing(es: Elasticsearch) -> None:
