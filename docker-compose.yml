@@ -2,7 +2,7 @@
 
 services:
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.18.0
+    image: docker.io/library/elasticsearch:8.18.0
     container_name: es-local
     environment:
       - discovery.type=single-node
