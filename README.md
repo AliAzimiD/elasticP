@@ -19,3 +19,4 @@ git clone <repo-url>
 cd multilingual-doc-service
 cp .env .env.local      # adjust variables if desired
 docker compose up --build
+```
