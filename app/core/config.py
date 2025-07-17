@@ -14,7 +14,11 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
-    es_host: str = Field(..., env="ES_HOST")
+    # Provide a sensible default so the service can start even if the
+    # environment variable is not explicitly supplied by docker-compose.
+    # This mirrors the value in ``.env`` and avoids a ValidationError on
+    # startup when the variable is missing.
+    es_host: str = Field("http://elasticsearch:9200", env="ES_HOST")
     es_index: str = Field("documents", env="ES_INDEX")
     log_level: str = Field("INFO", env="LOG_LEVEL")
 
