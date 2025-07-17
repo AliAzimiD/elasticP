@@ -1,26 +1,25 @@
-"""
-Elasticsearch client factory, plus index creation and health checks.
-"""
-
-from elasticsearch import Elasticsearch, NotFoundError, TransportError
-from elasticsearch.helpers import bulk
+# app/db/elastic.py
+import time
+from elasticsearch import Elasticsearch
 from app.core.config import get_settings
 from app.core.logger import logger
 
 settings = get_settings()
 
+def get_es_client(retries: int = 12, delay: int = 5) -> Elasticsearch:
+    """Return an ES client, retrying <retries> times with <delay>s back‑off."""
+    hosts = settings.es_host.split(",")
+    for attempt in range(1, retries + 1):
+        try:
+            es = Elasticsearch(hosts)
+            if es.ping():
+                return es
+        except Exception as exc:
+            logger.warning("ES connection failed (attempt %d/%d): %s",
+                           attempt, retries, exc)
+        time.sleep(delay)
+    raise ConnectionError(f"Cannot connect to Elasticsearch after {retries*delay}s")
 
-def get_es_client() -> Elasticsearch:
-    """
-    Create a new Elasticsearch client instance.
-
-    Called by FastAPI's dependency injection system
-    so each request gets a lightweight reference (thread-safe).
-    """
-    es = Elasticsearch(settings.es_host.split(","))  # support multiple hosts
-    if not es.ping():
-        raise ConnectionError(f"Cannot connect to Elasticsearch at {settings.es_host}")
-    return es
 
 
 def create_index_if_missing(es: Elasticsearch) -> None:
